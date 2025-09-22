@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { Button } from "@/components/ui/button";
 import { signout } from "@/app/actions";
+import { HatGlasses } from "lucide-react";
 
 export default async function Header() {
   const supabase = await createClient();
@@ -13,8 +14,9 @@ export default async function Header() {
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link
           href="/"
-          className="text-xl font-medium text-slate-800 hover:text-amber-800 transition-colors"
+          className="flex items-center gap-2 text-xl font-medium text-slate-800 hover:text-amber-800 transition-colors"
         >
+          <HatGlasses size={30} />
           Tophat
         </Link>
 

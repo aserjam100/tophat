@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { signout } from "@/app/actions";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { Home, ListVideo, Settings, LogOut } from "lucide-react";
+import { Home, HatGlasses, ListVideo, Settings, LogOut } from "lucide-react";
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createClient();
@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }) {
             href="/dashboard"
             className="text-xl font-bold text-slate-800 hover:text-amber-800 transition-colors group relative"
           >
-            TH
+            <HatGlasses size={30} />
             <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
               Tophat
             </span>
