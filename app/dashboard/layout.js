@@ -16,8 +16,8 @@ export default async function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-stone-50 flex">
-      {/* Collapsed Sidebar */}
-      <aside className="w-16 bg-stone-100/80 border-r border-stone-200 flex flex-col">
+      {/* Fixed Sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-16 bg-stone-100/80 border-r border-stone-200 flex flex-col z-40">
         {/* Logo/Brand */}
         <div className="p-4 border-b border-stone-200/60 flex justify-center">
           <Link
@@ -84,8 +84,8 @@ export default async function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1">{children}</main>
+      {/* Main Content with left margin to account for fixed sidebar */}
+      <main className="flex-1 ml-16">{children}</main>
     </div>
   );
 }
