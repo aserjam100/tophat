@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Tophat",
+  title: "TopHat",
 };
 
 export default function RootLayout({ children }) {

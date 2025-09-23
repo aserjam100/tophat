@@ -110,7 +110,7 @@ export default async function LandingPage() {
       <footer className="border-t border-stone-200 bg-stone-100/30 py-12 mt-24">
         <div className="container mx-auto px-4 text-center">
           <p className="text-stone-500 text-sm">
-            © 2025 Tophat. All rights reserved.
+            © 2025 TopHat. All rights reserved.
           </p>
         </div>
       </footer>

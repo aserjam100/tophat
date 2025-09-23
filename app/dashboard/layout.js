@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { signout } from "@/app/actions";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { Home, HatGlasses, ListVideo, Settings, LogOut } from "lucide-react";
+import { Home, ListVideo, Settings, LogOut } from "lucide-react";
+import Image from "next/image";
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createClient();
@@ -23,9 +24,15 @@ export default async function DashboardLayout({ children }) {
             href="/dashboard"
             className="text-xl font-bold text-slate-800 hover:text-amber-800 transition-colors group relative"
           >
-            <HatGlasses size={30} />
+            <Image
+              src="/tophat.png"
+              alt="Tophat icon"
+              width={30}
+              height={30}
+              className="object-contain"
+            />
             <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-              Tophat
+              TopHat
             </span>
           </Link>
         </div>
@@ -44,17 +51,7 @@ export default async function DashboardLayout({ children }) {
                 </span>
               </Link>
             </li>
-            <li>
-              <Link
-                href="/dashboard/tests"
-                className="flex items-center justify-center w-12 h-12 text-stone-700 hover:text-slate-800 hover:bg-stone-200/60 rounded-lg transition-colors group relative"
-              >
-                <ListVideo size={20} />
-                <span className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                  Tests List
-                </span>
-              </Link>
-            </li>
+
             <li>
               <Link
                 href="/dashboard/settings"
