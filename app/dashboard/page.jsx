@@ -11,7 +11,6 @@ import {
   Eye,
   Plus,
   Calendar,
-  Timer,
 } from "lucide-react";
 
 // Helper function to format date
@@ -24,13 +23,6 @@ function formatDate(dateString) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-// Helper function to format execution time
-function formatExecutionTime(milliseconds) {
-  if (!milliseconds) return "N/A";
-  if (milliseconds < 1000) return `${milliseconds}ms`;
-  return `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
 // Status badge component
@@ -201,28 +193,7 @@ export default async function TestsList() {
                           <Calendar size={12} />
                           <span>{formatDate(test.created_at)}</span>
                         </div>
-                        {test.execution_time && (
-                          <div className="flex items-center gap-1">
-                            <Timer size={12} />
-                            <span>
-                              {formatExecutionTime(test.execution_time)}
-                            </span>
-                          </div>
-                        )}
-                        {test.screenshots && test.screenshots.length > 0 && (
-                          <div className="flex items-center gap-1">
-                            <Eye size={12} />
-                            <span>{test.screenshots.length} screenshot(s)</span>
-                          </div>
-                        )}
                       </div>
-
-                      {/* Error Message */}
-                      {test.error_message && test.status === "failed" && (
-                        <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                          <strong>Error:</strong> {test.error_message}
-                        </div>
-                      )}
                     </div>
 
                     {/* Action Buttons */}
