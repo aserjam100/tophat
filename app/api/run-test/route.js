@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
+import fs from 'fs';
 
 export async function POST(request) {
   try {
@@ -40,9 +41,17 @@ function generatePuppeteerScript(commands, testName, testDescription) {
   script += `// ${testDescription}\n`;
   script += `// Generated on: ${new Date().toISOString()}\n\n`;
   
-  script += `const puppeteer = require('puppeteer');\n\n`;
+  script += `const puppeteer = require('puppeteer');\n`;
+  script += `const fs = require('fs');\n\n`;
   script += `async function runTest() {\n`;
-  script += `  const browser = await puppeteer.launch({ headless: true });\n`;
+  script += `  const chromePath = fs.existsSync('/usr/bin/google-chrome') \n`;
+  script += `    ? '/usr/bin/google-chrome' \n`;
+  script += `    : '/usr/bin/chromium';\n\n`;
+  script += `  const browser = await puppeteer.launch({ \n`;
+  script += `    headless: true,\n`;
+  script += `    executablePath: chromePath,\n`;
+  script += `    args: ['--no-sandbox', '--disable-setuid-sandbox']\n`;
+  script += `  });\n`;
   script += `  const page = await browser.newPage();\n`;
   script += `  \n`;
   script += `  try {\n`;
@@ -139,10 +148,15 @@ async function executePuppeteerTest(commands) {
     // Import puppeteer directly
     const puppeteer = (await import('puppeteer')).default;
     
+    // Determine Chrome path
+    const chromePath = fs.existsSync('/usr/bin/google-chrome') 
+      ? '/usr/bin/google-chrome' 
+      : '/usr/bin/chromium';
+    
     // Execute the test directly
     const browser = await puppeteer.launch({ 
       headless: true,
-      executablePath: '/usr/bin/google-chrome', // Use system Chrome
+      executablePath: chromePath,
       args: ['--no-sandbox', '--disable-setuid-sandbox'] // For Linux compatibility
     });
     const page = await browser.newPage();
