@@ -22,6 +22,9 @@ export default function NewTestClient({ user }) {
 
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Add ref for the textarea
+  const textareaRef = useRef(null);
 
   // Function to update test data (shared between components)
   const updateTestData = (updates) => {
@@ -132,12 +135,13 @@ export default function NewTestClient({ user }) {
     };
 
     addMessage(userMessage);
+    const messageContent = currentMessage.trim(); // Store before clearing
     setCurrentMessage('');
     setIsLoading(true);
 
     try {
       // Generate commands based on user input
-      const commands = generateCommands(currentMessage.trim());
+      const commands = generateCommands(messageContent);
       
       // Generate test name and description
       const testName = "Login Functionality Test";
@@ -367,12 +371,17 @@ Check the Results tab for more details including error screenshots.`,
           <div className="p-4 border-t border-stone-200 flex-shrink-0">
             <div className="flex space-x-2">
               <textarea
+                ref={textareaRef}
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
+                    // Focus immediately after sending
+                    requestAnimationFrame(() => {
+                      textareaRef.current?.focus();
+                    });
                   }
                 }}
                 placeholder="Describe the test you want to create... (Shift+Enter for new line)"
@@ -380,6 +389,7 @@ Check the Results tab for more details including error screenshots.`,
                 disabled={isLoading}
                 rows={1}
                 style={{ overflowY: 'auto' }}
+                autoFocus
               />
               <Button 
                 onClick={handleSendMessage}
