@@ -32,7 +32,7 @@ export default async function TestsList() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-light text-slate-800 mb-2">
-                Dashboard
+                {userData.user.email}'s Dashboard
               </h1>
               <p className="text-stone-600">
                 Manage and view your Puppeteer test executions

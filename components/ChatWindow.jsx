@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Bot, User, Loader2 } from 'lucide-react';
+import { Bot, User, Loader2, Image } from 'lucide-react';
 
 export default function ChatWindow({ messages, isLoading, testData, updateTestData }) {
   const messagesEndRef = useRef(null);
@@ -59,6 +59,9 @@ export default function ChatWindow({ messages, isLoading, testData, updateTestDa
                   <div className="text-sm leading-relaxed whitespace-pre-wrap">
                     {message.content}
                   </div>
+                  
+                  
+                  
                   <div
                     className={`text-xs mt-2 opacity-70 ${
                       message.type === 'user' ? 'text-slate-300' : 'text-stone-600'
