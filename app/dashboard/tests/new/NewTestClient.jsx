@@ -13,17 +13,19 @@ export default function NewTestClient({ user }) {
     name: '',
     description: '',
     script: '',
-    commands: [], // Add commands array to state
+    commands: [],
     status: 'draft',
     messages: [],
     isRunning: false,
-    executionResults: null // Add execution results to state
+    executionResults: null
   });
 
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Add ref for the textarea
+  // Store conversation history for Claude API
+  const [conversationHistory, setConversationHistory] = useState([]);
+  
   const textareaRef = useRef(null);
 
   // Function to update test data (shared between components)
@@ -39,60 +41,27 @@ export default function NewTestClient({ user }) {
     }));
   };
 
-  // Generate commands based on user input
-  const generateCommands = (userInput) => {
-    // For now, generate hardcoded commands for login test
-    // Later this will be replaced by LLM API call
-    const commands = [
-      { 
-        action: "navigate", 
-        url: "http://localhost:3000/login",
-        description: "Navigate to login page"
-      },
-      { 
-        action: "waitForSelector", 
-        selector: "#email",
-        description: "Wait for email field to appear"
-      },
-      { 
-        action: "type", 
-        selector: "#email", 
-        text: "ozzy.main.official@gmail.com",
-        description: "Enter email"
-      },
-      { 
-        action: "waitForSelector", 
-        selector: "#password",
-        description: "Wait for password field to appear"
-      },
-      { 
-        action: "type", 
-        selector: "#password", 
-        text: "slipknot87",
-        description: "Enter password"
-      },
-      { 
-        action: "click", 
-        selector: 'button[type="submit"]',
-        description: "Click login button"
-      },
-      { 
-        action: "waitForNavigation", 
-        description: "Wait for page to load after login"
-      },
-      { 
-        action: "waitForText", 
-        text: "Dashboard",
-        description: "Verify successful login by checking dashboard page"
-      },
-      { 
-        action: "screenshot", 
-        filename: `login-test-success-${Date.now()}.png`,
-        description: "Take screenshot of successful login"
+  // Extract JSON commands from Claude's response
+  const extractCommandsFromResponse = (responseText) => {
+    // Look for JSON code block in the response
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+    
+    if (jsonMatch) {
+      try {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        return {
+          hasCommands: true,
+          testName: jsonData.testName,
+          testDescription: jsonData.testDescription,
+          commands: jsonData.commands
+        };
+      } catch (e) {
+        console.error('Failed to parse JSON from response:', e);
+        return { hasCommands: false };
       }
-    ];
-
-    return commands;
+    }
+    
+    return { hasCommands: false };
   };
 
   // Generate actual Puppeteer script from commands
@@ -123,7 +92,7 @@ export default function NewTestClient({ user }) {
     }
   };
 
-  // Handle sending message to Claude (placeholder)
+  // Handle sending message to Claude
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
 
@@ -135,53 +104,84 @@ export default function NewTestClient({ user }) {
     };
 
     addMessage(userMessage);
-    const messageContent = currentMessage.trim(); // Store before clearing
+    const messageContent = currentMessage.trim();
     setCurrentMessage('');
     setIsLoading(true);
 
     try {
-      // Generate commands based on user input
-      const commands = generateCommands(messageContent);
+      // Add user message to conversation history
+      const newHistory = [
+        ...conversationHistory,
+        { role: 'user', content: messageContent }
+      ];
+
+      // Call Claude API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: newHistory
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from Claude');
+      }
+
+      const data = await response.json();
+      const assistantContent = data.content;
+
+      // Add assistant message to chat
+      const assistantMessage = {
+        id: Date.now() + 1,
+        type: 'assistant',
+        content: assistantContent,
+        timestamp: new Date()
+      };
+      addMessage(assistantMessage);
+
+      // Update conversation history
+      const updatedHistory = [
+        ...newHistory,
+        { role: 'assistant', content: assistantContent }
+      ];
+      setConversationHistory(updatedHistory);
+
+      // Check if response contains commands
+      const commandData = extractCommandsFromResponse(assistantContent);
       
-      // Generate test name and description
-      const testName = "Login Functionality Test";
-      const testDescription = "Automated test to verify user login functionality with valid credentials";
-      
-      // Generate actual Puppeteer script
-      const puppeteerScript = await generatePuppeteerScript(commands, testName, testDescription);
+      if (commandData.hasCommands) {
+        // Generate Puppeteer script from commands
+        const puppeteerScript = await generatePuppeteerScript(
+          commandData.commands,
+          commandData.testName,
+          commandData.testDescription
+        );
 
-      // Simulate processing delay
-      setTimeout(() => {
-        const assistantMessage = {
-          id: Date.now() + 1,
-          type: 'assistant',
-          content: `I've generated a login test for you! This test will:
-
-1. Navigate to http://localhost:3000/login
-2. Enter the email: ozzy.main.official@gmail.com
-3. Enter the password: slipknot87
-4. Click the login button
-5. Verify successful login
-
-The test commands have been generated and converted to a Puppeteer script. You can see the details in the Test Preview panel.`,
-          timestamp: new Date()
-        };
-
-        addMessage(assistantMessage);
-        
         // Update test data with generated content
         updateTestData({
-          name: testName,
-          description: testDescription,
+          name: commandData.testName,
+          description: commandData.testDescription,
           script: puppeteerScript,
-          commands: commands,
-          executionResults: null // Reset execution results when generating new test
+          commands: commandData.commands,
+          executionResults: null
         });
-        
-        setIsLoading(false);
-      }, 1000);
+      }
+
+      setIsLoading(false);
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date()
+      };
+      addMessage(errorMessage);
+      
       setIsLoading(false);
     }
   };
@@ -196,7 +196,6 @@ The test commands have been generated and converted to a Puppeteer script. You c
     updateTestData({ isRunning: true, status: 'running' });
     
     try {
-      // Send commands to backend
       const response = await fetch('/api/run-test', {
         method: 'POST',
         headers: {
@@ -212,7 +211,6 @@ The test commands have been generated and converted to a Puppeteer script. You c
       if (response.ok) {
         const result = await response.json();
         
-        // Store the complete execution results
         const executionResults = {
           success: result.success,
           error: result.error,
@@ -228,7 +226,6 @@ The test commands have been generated and converted to a Puppeteer script. You c
           executionResults: executionResults
         });
         
-        // Add result message to chat
         const resultMessage = {
           id: Date.now(),
           type: 'assistant',
@@ -246,7 +243,7 @@ Screenshots: ${result.screenshots?.length || 0} captured
 
 Check the Results tab for more details including error screenshots.`,
           timestamp: new Date(),
-          screenshots: result.screenshots // Add screenshots to the message for chat display
+          screenshots: result.screenshots
         };
         addMessage(resultMessage);
       } else {
@@ -280,7 +277,7 @@ Check the Results tab for more details including error screenshots.`,
     }
   };
 
-  // Handle saving the test (placeholder)
+  // Handle saving the test
   const handleSaveTest = async () => {
     if (!testData.name || !testData.commands || testData.commands.length === 0) {
       alert('Please generate a test first before saving.');
@@ -288,7 +285,6 @@ Check the Results tab for more details including error screenshots.`,
     }
     
     try {
-      // TODO: Implement saving to Supabase
       const testToSave = {
         name: testData.name,
         description: testData.description,
@@ -357,7 +353,6 @@ Check the Results tab for more details including error screenshots.`,
             </p>
           </div>
           
-          {/* ChatWindow takes up remaining space */}
           <div className="flex-1 min-h-0">
             <ChatWindow 
               messages={testData.messages}
@@ -378,7 +373,6 @@ Check the Results tab for more details including error screenshots.`,
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
-                    // Focus immediately after sending
                     requestAnimationFrame(() => {
                       textareaRef.current?.focus();
                     });
