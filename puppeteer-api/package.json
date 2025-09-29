@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "postinstall": "pnpm exec puppeteer browsers install chrome"
+    "postinstall": "pnpm dlx puppeteer browsers install chrome"
   },
   "keywords": [],
   "author": "",
