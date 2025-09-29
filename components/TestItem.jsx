@@ -105,6 +105,7 @@ export default function TestItem({ test }) {
               View
             </Link>
           </Button>
+          {/*
           {test.status === "failed" && (
             <Button
               variant="outline"
@@ -114,7 +115,7 @@ export default function TestItem({ test }) {
               <Play size={14} className="mr-1" />
               Retry
             </Button>
-          )}
+          )}*/}
         </div>
       </div>
     </div>

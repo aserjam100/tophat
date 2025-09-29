@@ -27,12 +27,15 @@ export async function POST(request) {
     }
 
     // Prepare test data
+    // In POST handler, add these fields:
     const testData = {
       user_id: user.id,
       name,
       description: description || '',
-      instructions: JSON.stringify(commands), // Store commands as JSON
+      instructions: JSON.stringify(commands),
       status: status || 'draft',
+      messages: body.messages ? JSON.stringify(body.messages) : null,
+      conversation_history: body.conversationHistory ? JSON.stringify(body.conversationHistory) : null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

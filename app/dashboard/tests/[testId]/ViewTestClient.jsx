@@ -7,71 +7,113 @@ import { ArrowLeft, Send, Play, Save } from "lucide-react";
 import ChatWindow from "@/components/ChatWindow";
 import PreviewWindow from "@/components/PreviewWindow";
 
-export default function NewTestClient({ user }) {
-  // Add useEffect to load test if testId is in URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const testId = params.get("testId");
+export default function ViewTestClient({ user, test }) {
+  // Parse all stored data from the database
+  let parsedCommands = [];
+  let parsedScript = "";
+  let parsedMessages = [];
+  let parsedConversationHistory = [];
+  let parsedExecutionResults = null;
 
-    if (testId) {
-      loadExistingTest(testId);
-    }
-  }, []);
+  try {
+    // Parse instructions (commands)
+    if (test.instructions) {
+      const instructionsData =
+        typeof test.instructions === "string"
+          ? JSON.parse(test.instructions)
+          : test.instructions;
 
-  const loadExistingTest = async (testId) => {
-    try {
-      const response = await fetch(`/api/tests/${testId}`);
-      if (response.ok) {
-        const test = await response.json();
-
-        setCurrentTestId(testId);
-        setTestData({
-          name: test.name,
-          description: test.description,
-          script: "", // Will be regenerated if needed
-          commands: JSON.parse(test.instructions || "[]"),
-          status: test.status,
-          messages: test.messages ? JSON.parse(test.messages) : [],
-          isRunning: false,
-          executionResults: test.executionResults || null,
-        });
-
-        if (test.conversation_history) {
-          setConversationHistory(JSON.parse(test.conversation_history));
-        }
+      // Handle both old format (direct array) and new format (object with commands)
+      if (Array.isArray(instructionsData)) {
+        parsedCommands = instructionsData;
+      } else if (instructionsData.commands) {
+        parsedCommands = instructionsData.commands;
       }
-    } catch (error) {
-      console.error("Error loading test:", error);
-    }
-  };
 
-  // Shared state between chat and preview
+      if (instructionsData.script) {
+        parsedScript = instructionsData.script;
+      }
+    }
+
+    // Parse messages
+    if (test.messages) {
+      parsedMessages =
+        typeof test.messages === "string"
+          ? JSON.parse(test.messages)
+          : test.messages;
+    }
+
+    // Parse conversation history
+    if (test.conversation_history) {
+      parsedConversationHistory =
+        typeof test.conversation_history === "string"
+          ? JSON.parse(test.conversation_history)
+          : test.conversation_history;
+    }
+
+    // Parse execution results if they exist
+    if (test.execution_results) {
+      parsedExecutionResults =
+        typeof test.execution_results === "string"
+          ? JSON.parse(test.execution_results)
+          : test.execution_results;
+    }
+  } catch (e) {
+    console.error("Error parsing test data:", e);
+  }
+
+  // Initialize state with existing test data
   const [testData, setTestData] = useState({
-    name: "",
-    description: "",
-    script: "",
-    commands: [],
-    status: "draft",
-    messages: [],
+    id: test.id,
+    name: test.name || "",
+    description: test.description || "",
+    script: parsedScript,
+    commands: parsedCommands,
+    instructions: test.instructions || "",
+    status: test.status || "draft",
+    messages: parsedMessages,
     isRunning: false,
-    executionResults: null,
+    executionResults: parsedExecutionResults,
   });
 
   const [currentMessage, setCurrentMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentTestId, setCurrentTestId] = useState(null);
-
-  // Store conversation history for Claude API
-  const [conversationHistory, setConversationHistory] = useState([]);
+  const [conversationHistory, setConversationHistory] = useState(
+    parsedConversationHistory
+  );
 
   const textareaRef = useRef(null);
 
-  // Function to update test data (shared between components)
+  // Add initial message showing test is loaded (only if no messages exist)
+  useEffect(() => {
+    if (testData.messages.length === 0) {
+      const welcomeMessage = {
+        id: Date.now(),
+        type: "assistant",
+        content: `✅ Test "${test.name}" has been loaded. You can modify the test, run it, or ask me questions about it.`,
+        timestamp: new Date(),
+      };
+      addMessage(welcomeMessage);
+    }
+  }, []);
+
+  // Generate script if we have commands but no script
+  useEffect(() => {
+    if (testData.commands.length > 0 && !testData.script) {
+      generatePuppeteerScript(
+        testData.commands,
+        testData.name,
+        testData.description
+      ).then((script) => {
+        updateTestData({ script });
+      });
+    }
+  }, []);
+
   const updateTestData = (updates) => {
     setTestData((prev) => ({ ...prev, ...updates }));
   };
 
-  // Function to add a message to the chat
   const addMessage = (message) => {
     setTestData((prev) => ({
       ...prev,
@@ -79,9 +121,7 @@ export default function NewTestClient({ user }) {
     }));
   };
 
-  // Extract JSON commands from Claude's response
   const extractCommandsFromResponse = (responseText) => {
-    // Look for JSON code block in the response
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
 
     if (jsonMatch) {
@@ -102,7 +142,6 @@ export default function NewTestClient({ user }) {
     return { hasCommands: false };
   };
 
-  // Generate actual Puppeteer script from commands
   const generatePuppeteerScript = async (
     commands,
     testName,
@@ -134,7 +173,6 @@ export default function NewTestClient({ user }) {
     }
   };
 
-  // Handle sending message to Claude
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
 
@@ -151,13 +189,11 @@ export default function NewTestClient({ user }) {
     setIsLoading(true);
 
     try {
-      // Add user message to conversation history
       const newHistory = [
         ...conversationHistory,
         { role: "user", content: messageContent },
       ];
 
-      // Call Claude API
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -175,7 +211,6 @@ export default function NewTestClient({ user }) {
       const data = await response.json();
       const assistantContent = data.content;
 
-      // Add assistant message to chat
       const assistantMessage = {
         id: Date.now() + 1,
         type: "assistant",
@@ -184,25 +219,21 @@ export default function NewTestClient({ user }) {
       };
       addMessage(assistantMessage);
 
-      // Update conversation history
       const updatedHistory = [
         ...newHistory,
         { role: "assistant", content: assistantContent },
       ];
       setConversationHistory(updatedHistory);
 
-      // Check if response contains commands
       const commandData = extractCommandsFromResponse(assistantContent);
 
       if (commandData.hasCommands) {
-        // Generate Puppeteer script from commands
         const puppeteerScript = await generatePuppeteerScript(
           commandData.commands,
           commandData.testName,
           commandData.testDescription
         );
 
-        // Update test data with generated content
         updateTestData({
           name: commandData.testName,
           description: commandData.testDescription,
@@ -228,7 +259,6 @@ export default function NewTestClient({ user }) {
     }
   };
 
-  // Handle running the test
   const handleRunTest = async () => {
     if (!testData.commands || testData.commands.length === 0) {
       alert("No test commands to run. Please generate a test first.");
@@ -275,13 +305,13 @@ export default function NewTestClient({ user }) {
           type: "assistant",
           content: result.success
             ? `✅ Test passed successfully! 
-          
+            
 Execution time: ${result.executionTime}ms
 Screenshots: ${result.screenshots?.length || 0} captured
 
 The results have been updated in the Results tab of the Test Preview.`
             : `❌ Test failed: ${result.error || "Unknown error"}
-          
+            
 Execution time: ${result.executionTime || 0}ms
 Screenshots: ${result.screenshots?.length || 0} captured
 
@@ -290,44 +320,34 @@ Check the Results tab for more details including error screenshots.`,
         };
         addMessage(resultMessage);
 
-        // Auto-save or update test after execution
+        // Update existing test with ALL current data
         try {
-          const isUpdate = currentTestId !== null;
-          const saveUrl = isUpdate
-            ? `/api/tests/${currentTestId}`
-            : "/api/tests";
-          const saveMethod = isUpdate ? "PUT" : "POST";
+          const instructionsData = {
+            commands: testData.commands,
+            script: testData.script,
+          };
 
-          const saveResponse = await fetch(saveUrl, {
-            method: saveMethod,
+          const saveResponse = await fetch(`/api/tests/${testData.id}`, {
+            method: "PUT",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
               name: testData.name,
               description: testData.description,
-              commands: testData.commands,
               status: newStatus,
-              executionResults: executionResults,
-              messages: [...testData.messages, resultMessage],
-              conversationHistory: conversationHistory,
+              instructions: JSON.stringify(instructionsData),
+              messages: JSON.stringify([...testData.messages, resultMessage]),
+              conversation_history: JSON.stringify(conversationHistory),
+              execution_results: JSON.stringify(executionResults),
             }),
           });
 
           if (saveResponse.ok) {
-            const saveResult = await saveResponse.json();
-
-            // Store test ID if this was a new save
-            if (!isUpdate) {
-              setCurrentTestId(saveResult.test?.id || saveResult.id);
-            }
-
             const saveMessage = {
               id: Date.now() + 1,
               type: "assistant",
-              content: `💾 Test has been automatically ${
-                isUpdate ? "updated" : "saved"
-              }.`,
+              content: `💾 Test results have been automatically saved.`,
               timestamp: new Date(),
             };
             addMessage(saveMessage);
@@ -366,7 +386,6 @@ Check the Results tab for more details including error screenshots.`,
     }
   };
 
-  // Handle saving the test
   const handleSaveTest = async () => {
     if (
       !testData.name ||
@@ -378,55 +397,46 @@ Check the Results tab for more details including error screenshots.`,
     }
 
     try {
-      // Determine if this is an update or create
-      const isUpdate = currentTestId !== null;
-      const url = isUpdate ? `/api/tests/${currentTestId}` : "/api/tests";
-      const method = isUpdate ? "PUT" : "POST";
+      const instructionsData = {
+        commands: testData.commands,
+        script: testData.script,
+      };
 
-      const response = await fetch(url, {
-        method: method,
+      const response = await fetch(`/api/tests/${testData.id}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: testData.name,
           description: testData.description,
-          commands: testData.commands,
+          instructions: JSON.stringify(instructionsData),
           status: testData.status,
-          executionResults: testData.executionResults,
-          messages: testData.messages, // Save chat messages
-          conversationHistory: conversationHistory, // Save Claude conversation
+          messages: JSON.stringify(testData.messages),
+          conversation_history: JSON.stringify(conversationHistory),
+          execution_results: testData.executionResults
+            ? JSON.stringify(testData.executionResults)
+            : null,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save test");
+        throw new Error(errorData.error || "Failed to update test");
       }
 
-      const result = await response.json();
-
-      // Store the test ID for future updates
-      if (!isUpdate) {
-        setCurrentTestId(result.test?.id || result.id);
-      }
-
-      alert(
-        isUpdate ? "Test updated successfully!" : "Test saved successfully!"
-      );
+      alert("Test updated successfully!");
 
       const successMessage = {
         id: Date.now(),
         type: "assistant",
-        content: `✅ Test "${testData.name}" has been ${
-          isUpdate ? "updated" : "saved"
-        } successfully!`,
+        content: `✅ Test "${testData.name}" has been updated successfully!`,
         timestamp: new Date(),
       };
       addMessage(successMessage);
     } catch (error) {
-      console.error("Error saving test:", error);
-      alert(`Failed to save test: ${error.message}`);
+      console.error("Error updating test:", error);
+      alert(`Failed to update test: ${error.message}`);
     }
   };
 
@@ -443,6 +453,10 @@ Check the Results tab for more details including error screenshots.`,
                   Back to Dashboard
                 </Link>
               </Button>
+              <div className="text-sm text-stone-600">
+                Viewing:{" "}
+                <span className="font-medium text-slate-800">{test.name}</span>
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -470,7 +484,7 @@ Check the Results tab for more details including error screenshots.`,
                 className="bg-slate-800 hover:bg-slate-700"
               >
                 <Save size={16} className="mr-2" />
-                Save Test
+                Save Changes
               </Button>
             </div>
           </div>
@@ -484,7 +498,7 @@ Check the Results tab for more details including error screenshots.`,
           <div className="p-4 border-b border-stone-200 flex-shrink-0">
             <h2 className="text-lg font-medium text-slate-800">Mad Hatter</h2>
             <p className="text-sm text-stone-600">
-              Describe what you want to test and I'll help you build it
+              Ask me to modify the test or run new commands
             </p>
           </div>
 
@@ -513,7 +527,7 @@ Check the Results tab for more details including error screenshots.`,
                     });
                   }
                 }}
-                placeholder="Describe the test you want to create... (Shift+Enter for new line)"
+                placeholder="Ask me to modify this test... (Shift+Enter for new line)"
                 className="flex-1 px-3 py-2 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none min-h-[40px] max-h-[120px]"
                 disabled={isLoading}
                 rows={1}
@@ -536,7 +550,7 @@ Check the Results tab for more details including error screenshots.`,
           <div className="p-4 bg-white border-b border-stone-200 flex-shrink-0">
             <h2 className="text-lg font-medium text-slate-800">Test Preview</h2>
             <p className="text-sm text-stone-600">
-              Generated script and test details
+              Current script and test details
             </p>
           </div>
 
