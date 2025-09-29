@@ -347,7 +347,7 @@ export default function PreviewWindow({
                       )}
                     </div>
 
-                    {/* Screenshots Section */}
+                    {/* Screenshots Section - FIXED */}
                     {testData.executionResults.screenshots && testData.executionResults.screenshots.length > 0 && (
                       <div>
                         <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
@@ -355,34 +355,51 @@ export default function PreviewWindow({
                           Screenshots ({testData.executionResults.screenshots.length})
                         </h4>
                         <div className="grid gap-4">
-                          {testData.executionResults.screenshots.map((screenshot, index) => (
-                            <div key={index} className="border border-stone-200 rounded-lg overflow-hidden bg-white">
-                              <div className="p-2 bg-stone-50 border-b border-stone-200">
-                                <p className="text-sm font-medium text-stone-700">
-                                  {screenshot}
-                                </p>
-                              </div>
-                              <div className="p-2">
-                                <img 
-                                  src={`/screenshots/${screenshot}`} 
-                                  alt={`Test screenshot ${index + 1}`}
-                                  className="w-full h-auto max-h-96 object-contain bg-gray-50 rounded"
-                                  onError={(e) => {
-                                    e.target.parentElement.innerHTML = `
-                                      <div class="flex items-center justify-center h-32 bg-stone-100 text-stone-500 rounded">
-                                        <div class="text-center">
-                                          <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                          </svg>
-                                          <p class="text-sm">Screenshot not available</p>
+                          {testData.executionResults.screenshots.map((screenshot, index) => {
+                            // Handle both string format (old) and object format (new)
+                            const screenshotData = typeof screenshot === 'string' 
+                              ? { filename: screenshot, data: `/screenshots/${screenshot}`, type: 'success' }
+                              : screenshot;
+                            
+                            return (
+                              <div key={index} className="border border-stone-200 rounded-lg overflow-hidden bg-white">
+                                <div className="p-2 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                                  <p className="text-sm font-medium text-stone-700">
+                                    {screenshotData.filename}
+                                  </p>
+                                  {screenshotData.type === 'failure' && (
+                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                                      Failure
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="p-2">
+                                  <img 
+                                    src={screenshotData.data || screenshotData.url || `/screenshots/${screenshotData.filename}`}
+                                    alt={`Test screenshot ${index + 1}`}
+                                    className="w-full h-auto max-h-96 object-contain bg-gray-50 rounded"
+                                    onError={(e) => {
+                                      e.target.parentElement.innerHTML = `
+                                        <div class="flex items-center justify-center h-32 bg-stone-100 text-stone-500 rounded">
+                                          <div class="text-center">
+                                            <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                            </svg>
+                                            <p class="text-sm">Screenshot not available</p>
+                                          </div>
                                         </div>
-                                      </div>
-                                    `;
-                                  }}
-                                />
+                                      `;
+                                    }}
+                                  />
+                                </div>
+                                {screenshotData.takenAt && (
+                                  <div className="px-2 pb-2 text-xs text-stone-500">
+                                    Captured at: {new Date(screenshotData.takenAt).toLocaleString()}
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

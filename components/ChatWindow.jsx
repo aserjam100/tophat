@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Bot, User, Loader2, Image } from 'lucide-react';
+import { Bot, User, Loader2, Image as ImageIcon } from 'lucide-react';
 
 export default function ChatWindow({ messages, isLoading, testData, updateTestData }) {
   const messagesEndRef = useRef(null);
@@ -59,6 +59,49 @@ export default function ChatWindow({ messages, isLoading, testData, updateTestDa
                   <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                     {message.content}
                   </div>
+                  
+                  {/* Render screenshots if present in message */}
+                  {message.screenshots && message.screenshots.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-stone-200">
+                      <div className="flex items-center gap-2 mb-2 text-xs font-medium text-stone-600">
+                        <ImageIcon size={14} />
+                        <span>Screenshots ({message.screenshots.length})</span>
+                      </div>
+                      <div className="space-y-2">
+                        {message.screenshots.map((screenshot, idx) => {
+                          // Handle both string and object formats
+                          const screenshotData = typeof screenshot === 'string'
+                            ? { filename: screenshot, data: `/screenshots/${screenshot}` }
+                            : screenshot;
+                          
+                          return (
+                            <div key={idx} className="border border-stone-300 rounded overflow-hidden">
+                              <img
+                                src={screenshotData.data || screenshotData.url}
+                                alt={screenshotData.filename || `Screenshot ${idx + 1}`}
+                                className="w-full h-auto max-h-48 object-contain bg-white"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  const errorDiv = document.createElement('div');
+                                  errorDiv.className = 'flex items-center justify-center h-24 bg-stone-50 text-stone-500 text-xs';
+                                  errorDiv.textContent = 'Screenshot unavailable';
+                                  e.target.parentElement.appendChild(errorDiv);
+                                }}
+                              />
+                              {screenshotData.filename && (
+                                <div className="px-2 py-1 bg-white text-xs text-stone-600 flex items-center justify-between">
+                                  <span className="truncate">{screenshotData.filename}</span>
+                                  {screenshotData.type === 'failure' && (
+                                    <span className="ml-2 text-red-600 font-medium">Failed</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   
                   <div
                     className={`text-xs mt-2 opacity-70 ${

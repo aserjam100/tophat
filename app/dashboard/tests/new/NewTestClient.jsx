@@ -220,9 +220,11 @@ export default function NewTestClient({ user }) {
           timestamp: new Date().toISOString()
         };
         
+        const newStatus = result.success ? 'passed' : 'failed';
+        
         updateTestData({ 
           isRunning: false,
-          status: result.success ? 'passed' : 'failed',
+          status: newStatus,
           executionResults: executionResults
         });
         
@@ -242,10 +244,40 @@ Execution time: ${result.executionTime || 0}ms
 Screenshots: ${result.screenshots?.length || 0} captured
 
 Check the Results tab for more details including error screenshots.`,
-          timestamp: new Date(),
-          screenshots: result.screenshots
+          timestamp: new Date()
         };
         addMessage(resultMessage);
+        
+        // Auto-save test after execution
+        try {
+          const saveResponse = await fetch('/api/tests', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: testData.name,
+              description: testData.description,
+              commands: testData.commands,
+              status: newStatus,
+              executionResults: executionResults
+            }),
+          });
+
+          if (saveResponse.ok) {
+            const saveMessage = {
+              id: Date.now() + 1,
+              type: 'assistant',
+              content: `💾 Test has been automatically saved to your database.`,
+              timestamp: new Date()
+            };
+            addMessage(saveMessage);
+          }
+        } catch (saveError) {
+          console.error('Error auto-saving test:', saveError);
+          // Don't show error to user, just log it
+        }
+        
       } else {
         const errorText = await response.text();
         throw new Error(`Failed to run test: ${errorText}`);
@@ -285,21 +317,42 @@ Check the Results tab for more details including error screenshots.`,
     }
     
     try {
-      const testToSave = {
-        name: testData.name,
-        description: testData.description,
-        commands: testData.commands,
-        script: testData.script,
-        executionResults: testData.executionResults,
-        createdBy: user?.id,
-        createdAt: new Date().toISOString()
-      };
+      const response = await fetch('/api/tests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: testData.name,
+          description: testData.description,
+          commands: testData.commands,
+          status: testData.status,
+          executionResults: testData.executionResults
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save test');
+      }
+
+      const result = await response.json();
       
-      console.log('Saving test:', testToSave);
+      // Show success message
       alert('Test saved successfully!');
+      
+      // Add success message to chat
+      const successMessage = {
+        id: Date.now(),
+        type: 'assistant',
+        content: `✅ Test "${testData.name}" has been saved successfully!`,
+        timestamp: new Date()
+      };
+      addMessage(successMessage);
+      
     } catch (error) {
       console.error('Error saving test:', error);
-      alert('Failed to save test');
+      alert(`Failed to save test: ${error.message}`);
     }
   };
 

@@ -17,12 +17,12 @@ export async function POST(request) {
     const puppeteerScript = generatePuppeteerScript(commands, testName, testDescription);
     
     // Execute the test
-    const result = await executePuppeteerTest(commands); // Pass commands instead of script
+    const result = await executePuppeteerTest(commands);
 
     return NextResponse.json({
       success: result.success,
       error: result.error,
-      puppeteerScript: puppeteerScript, // Return the generated script
+      puppeteerScript: puppeteerScript,
       executionTime: result.executionTime,
       screenshots: result.screenshots || []
     });
@@ -145,19 +145,16 @@ async function executePuppeteerTest(commands) {
   const startTime = Date.now();
   
   try {
-    // Import puppeteer directly
     const puppeteer = (await import('puppeteer')).default;
     
-    // Determine Chrome path
     const chromePath = fs.existsSync('/usr/bin/google-chrome') 
       ? '/usr/bin/google-chrome' 
       : '/usr/bin/chromium';
     
-    // Execute the test directly
     const browser = await puppeteer.launch({ 
       headless: true,
       executablePath: chromePath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // For Linux compatibility
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const page = await browser.newPage();
     
@@ -178,18 +175,30 @@ async function executePuppeteerTest(commands) {
         }
       }
       
-      console.log('✅ Test completed successfully!');
+      console.log('Test completed successfully!');
       testResult = { success: true };
       
     } catch (error) {
-      console.error('❌ Test failed:', error.message);
-      // Take screenshot on failure
-      const failureScreenshot = `test-failure-${Date.now()}.png`;
-      await page.screenshot({ 
-        path: `public/screenshots/${failureScreenshot}`, 
-        fullPage: true 
-      });
-      screenshots.push(failureScreenshot);
+      console.error('Test failed:', error.message);
+      
+      // Take screenshot on failure and convert to base64
+      try {
+        const failureScreenshot = await page.screenshot({ 
+          fullPage: true,
+          type: 'png'
+        });
+        
+        const base64Screenshot = failureScreenshot.toString('base64');
+        screenshots.push({
+          filename: `test-failure-${Date.now()}.png`,
+          data: `data:image/png;base64,${base64Screenshot}`,
+          takenAt: new Date().toISOString(),
+          type: 'failure'
+        });
+      } catch (screenshotError) {
+        console.error('Failed to capture failure screenshot:', screenshotError);
+      }
+      
       testResult = { success: false, error: error.message };
     } finally {
       await browser.close();
@@ -210,7 +219,8 @@ async function executePuppeteerTest(commands) {
     return {
       success: false,
       error: error.message,
-      executionTime: executionTime
+      executionTime: executionTime,
+      screenshots: []
     };
   }
 }
@@ -248,8 +258,23 @@ async function executeCommand(page, command) {
     case 'screenshot':
       const filename = command.filename || `screenshot-${Date.now()}.png`;
       console.log(`Taking screenshot: ${filename}`);
-      await page.screenshot({ path: `public/screenshots/${filename}`, fullPage: true });
-      return { screenshot: filename };
+      
+      // Capture screenshot as buffer and convert to base64
+      const screenshotBuffer = await page.screenshot({ 
+        fullPage: true,
+        type: 'png'
+      });
+      
+      const base64Screenshot = screenshotBuffer.toString('base64');
+      
+      return { 
+        screenshot: {
+          filename: filename,
+          data: `data:image/png;base64,${base64Screenshot}`,
+          takenAt: new Date().toISOString(),
+          type: 'success'
+        }
+      };
       
     case 'waitForText':
       console.log(`Waiting for text: ${command.text}`);
@@ -310,7 +335,7 @@ async function executeCommand(page, command) {
       if (!text.includes(command.expectedText)) {
         throw new Error(`Text assertion failed: Expected "${command.expectedText}" but found "${text}"`);
       }
-      console.log('✅ Text assertion passed');
+      console.log('Text assertion passed');
       break;
       
     case 'assertElementExists':
@@ -319,7 +344,7 @@ async function executeCommand(page, command) {
       if (!elementExists) {
         throw new Error(`Element assertion failed: Element "${command.selector}" not found`);
       }
-      console.log('✅ Element assertion passed');
+      console.log('Element assertion passed');
       break;
       
     case 'clearInput':
@@ -330,7 +355,7 @@ async function executeCommand(page, command) {
       break;
       
     default:
-      console.warn(`⚠️  Unknown command: ${command.action}`);
+      console.warn(`Unknown command: ${command.action}`);
       break;
   }
   
