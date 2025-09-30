@@ -14,12 +14,18 @@ export async function login(formData) {
     password: formData.get("password"),
   };
 
-  const { error } = await supabase.auth.signInWithPassword(data);
+  try {
+    const { error } = await supabase.auth.signInWithPassword(data);
 
-  if (error) {
-    redirect("/error");
+    if (error) {
+      console.error("Auth Error: ", error);
+      //redirect("/error");
+      return;
+    }
+
+    revalidatePath("/", "layout");
+    redirect("/dashboard");
+  } catch (networkError) {
+    console.error("Network Error: ", networkError);
   }
-
-  revalidatePath("/", "layout");
-  redirect("/dashboard");
 }
