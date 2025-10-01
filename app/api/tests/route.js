@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 export async function POST(request) {
   try {
@@ -76,6 +77,9 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    // Add this line to revalidate the dashboard page
+    revalidatePath("/dashboard");
 
     return NextResponse.json({
       success: true,
