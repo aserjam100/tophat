@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "postinstall": "pnpm dlx puppeteer browsers install chrome"
+    "postinstall": "PUPPETEER_CACHE_DIR=./.cache/puppeteer pnpm dlx puppeteer browsers install chrome"
   },
   "keywords": [],
   "author": "",
