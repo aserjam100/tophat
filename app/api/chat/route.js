@@ -1,15 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { NextResponse } from 'next/server';
+import Anthropic from "@anthropic-ai/sdk";
+import { NextResponse } from "next/server";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const PUPPETEER_API_URL =
+  process.env.PUPPETEER_API_URL || "http://localhost:3001";
+
 const SYSTEM_PROMPT = `You are Mad Hatter, an expert QA automation assistant specializing in generating Puppeteer test commands. Your role is to:
 
-1. Ask clarifying questions to understand what the user wants to test
-2. Gather necessary details (URLs, selectors, test data, expected outcomes)
-3. Generate structured test commands in the exact format specified below
+1. When a user provides a URL to a form, use the scrape_form tool to analyze it first
+2. Ask clarifying questions to understand what the user wants to test
+3. Gather necessary details (URLs, selectors, test data, expected outcomes)
+4. Generate structured test commands in the exact format specified below
 
 **Available Commands:**
 - navigate: {action: "navigate", url: "URL", description: "..."}
@@ -19,74 +23,208 @@ const SYSTEM_PROMPT = `You are Mad Hatter, an expert QA automation assistant spe
 - waitForNavigation: {action: "waitForNavigation", description: "..."}
 - waitForText: {action: "waitForText", text: "TEXT", description: "..."}
 - screenshot: {action: "screenshot", filename: "FILENAME.png", description: "..."}
+- selectOption: {action: "selectOption", selector: "CSS_SELECTOR", value: "VALUE", description: "..."}
 
 **CRITICAL CSS Selector Rules:**
 - IDs MUST start with #: Use "#email" NOT "email"
 - Classes MUST start with .: Use ".button" NOT "button"
 - Attributes use brackets: Use "[name='email']" for name attributes
-- Ask the user for the EXACT selector if you're unsure
-- Common patterns:
-  * ID: "#email", "#password", "#submit-button"
-  * Class: ".form-input", ".btn-primary"
-  * Name attribute: "[name='email']", "[name='password']"
-  * Type attribute: "input[type='email']", "button[type='submit']"
+- Use the exact selectors provided by the scrape_form tool
 
 **Your Workflow:**
-1. When user describes a test, ask specific questions:
-   - What URL should the test start at?
-   - What specific elements need to be interacted with? (ask for CSS selectors or IDs)
-   - What data should be entered? (emails, passwords, text, etc.)
-   - What should the test verify? (text, navigation, elements)
-   
-2. Once you have enough information, respond with:
-   - A summary of the test
-   - The complete test commands in a JSON code block
+1. If user provides a URL, use scrape_form tool immediately to analyze the form structure
+2. After scraping, present the fields you found in a clear, organized way
+3. Ask the user for the information needed to fill each field
+4. Once you have all information, generate the complete test commands
 
-**Example Response When Ready to Generate:**
-\`\`\`json
-{
-  "testName": "Login Test",
-  "testDescription": "Test user login with valid credentials",
-  "commands": [
-    {"action": "navigate", "url": "http://localhost:3000/login", "description": "Navigate to login page"},
-    {"action": "waitForSelector", "selector": "#email", "description": "Wait for email field"},
-    {"action": "type", "selector": "#email", "text": "user@example.com", "description": "Enter email"},
-    {"action": "type", "selector": "#password", "text": "password123", "description": "Enter password"},
-    {"action": "click", "selector": "button[type='submit']", "description": "Click login button"},
-    {"action": "waitForNavigation", "description": "Wait for navigation after login"},
-    {"action": "waitForText", "text": "Dashboard", "description": "Verify successful login"},
-    {"action": "screenshot", "filename": "login-success.png", "description": "Take success screenshot"}
-  ]
-}
-\`\`\`
+**Example Response After Scraping:**
+"I've analyzed the form at [URL] and found these fields:
+
+**Required Fields:**
+- Email → selector: #email
+- Password → selector: #password
+- Company Name → selector: [name='company']
+
+**Optional Fields:**
+- Phone → selector: #phone
+- Message → selector: textarea.message
+
+**Submit Button:**
+- selector: button[type='submit']
+
+Please provide:
+1. Email address to use
+2. Password to enter
+3. Company name
+4. (Optional) Phone number
+5. (Optional) Message text"
 
 **Important Rules:**
-- Only discuss test automation and Puppeteer commands
-- Always ask for specific CSS selectors/IDs rather than assuming
-- Be concise but thorough
+- Always use scrape_form when a URL is provided
+- Use the exact selectors from the scraped data
 - Generate commands only when you have all necessary information
-- If user's request is unclear, ask specific questions
-- Stay focused on test generation, politely decline off-topic requests`;
+- Be conversational and guide the user through the process`;
+
+// Define the scrape_form tool
+const tools = [
+  {
+    name: "scrape_form",
+    description:
+      "Scrapes a web form to identify all input fields, their types, labels, selectors, and requirements. Use this immediately when the user provides a URL to understand what fields exist on the form.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description:
+            "The full URL of the form to scrape (must include http:// or https://)",
+        },
+      },
+      required: ["url"],
+    },
+  },
+];
+
+// Function to call your Puppeteer API for scraping
+async function scrapeFormFields(url) {
+  try {
+    const response = await fetch(`${PUPPETEER_API_URL}/api/scrape-form`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Scraping failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || "Scraping failed");
+    }
+
+    return data;
+  } catch (error) {
+    throw new Error(`Failed to scrape form: ${error.message}`);
+  }
+}
 
 export async function POST(request) {
   try {
     const { messages } = await request.json();
 
+    // First call to Claude with tools
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: "claude-sonnet-4-20250514",
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
+      tools: tools,
       messages: messages,
     });
 
+    // Check if Claude wants to use a tool
+    if (response.stop_reason === "tool_use") {
+      const toolUse = response.content.find(
+        (block) => block.type === "tool_use"
+      );
+
+      if (toolUse && toolUse.name === "scrape_form") {
+        console.log("Scraping form:", toolUse.input.url);
+
+        try {
+          // Execute the scraping via your Render API
+          const scrapedData = await scrapeFormFields(toolUse.input.url);
+
+          // Continue conversation with tool result
+          const followUpResponse = await anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 4000,
+            system: SYSTEM_PROMPT,
+            tools: tools,
+            messages: [
+              ...messages,
+              {
+                role: "assistant",
+                content: response.content,
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "tool_result",
+                    tool_use_id: toolUse.id,
+                    content: JSON.stringify(scrapedData, null, 2),
+                  },
+                ],
+              },
+            ],
+          });
+
+          // Return the text response after tool use
+          const textContent = followUpResponse.content.find(
+            (block) => block.type === "text"
+          );
+          return NextResponse.json({
+            content: textContent?.text || "Form scraped successfully",
+            id: followUpResponse.id,
+            toolUsed: true,
+            scrapedData: scrapedData,
+          });
+        } catch (scrapingError) {
+          // If scraping fails, tell Claude and let it continue
+          const errorResponse = await anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 4000,
+            system: SYSTEM_PROMPT,
+            tools: tools,
+            messages: [
+              ...messages,
+              {
+                role: "assistant",
+                content: response.content,
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "tool_result",
+                    tool_use_id: toolUse.id,
+                    is_error: true,
+                    content: `Failed to scrape form: ${scrapingError.message}`,
+                  },
+                ],
+              },
+            ],
+          });
+
+          const textContent = errorResponse.content.find(
+            (block) => block.type === "text"
+          );
+          return NextResponse.json({
+            content:
+              textContent?.text ||
+              "Scraping failed, please provide field details manually",
+            id: errorResponse.id,
+            toolUsed: true,
+            error: scrapingError.message,
+          });
+        }
+      }
+    }
+
+    // Regular text response (no tool use)
     return NextResponse.json({
       content: response.content[0].text,
       id: response.id,
+      toolUsed: false,
     });
   } catch (error) {
-    console.error('Error calling Claude API:', error);
+    console.error("Error calling Claude API:", error);
     return NextResponse.json(
-      { error: 'Failed to get response from Claude' },
+      { error: "Failed to get response from Claude", details: error.message },
       { status: 500 }
     );
   }

@@ -321,13 +321,13 @@ async function executeCommand(page, command) {
           window.scrollTo(0, document.body.scrollHeight);
         }
       }, scrollY);
-      await page.waitForTimeout(500);
+      await new Promise((resolve) => setTimeout(resolve, 500));
       break;
 
     case "wait":
       const duration = command.duration || 1000;
       console.log(`Waiting ${duration}ms...`);
-      await page.waitForTimeout(duration);
+      await new Promise((resolve) => setTimeout(resolve, duration));
       break;
 
     case "getCookies":
@@ -385,6 +385,122 @@ async function executeCommand(page, command) {
 
   return null;
 }
+
+// Add this new endpoint after your existing routes
+app.post("/api/scrape-form", async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: "No URL provided",
+      });
+    }
+
+    console.log("Scraping form:", url);
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    try {
+      await page.goto(url, {
+        waitUntil: "networkidle0",
+        timeout: 30000,
+      });
+
+      // Wait a bit for dynamic content
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const fields = await page.evaluate(() => {
+        const inputs = Array.from(
+          document.querySelectorAll(
+            "input, textarea, select, button[type='submit']"
+          )
+        );
+
+        return inputs
+          .map((input, index) => {
+            // Generate a reliable selector
+            let selector = "";
+            if (input.id) {
+              selector = `#${input.id}`;
+            } else if (input.name) {
+              selector = `[name="${input.name}"]`;
+            } else if (input.className) {
+              const firstClass = input.className.split(" ")[0];
+              selector = `.${firstClass}`;
+            } else {
+              selector = `${input.tagName.toLowerCase()}:nth-of-type(${
+                index + 1
+              })`;
+            }
+
+            // Get label text
+            let label = "";
+            if (input.labels && input.labels[0]) {
+              label = input.labels[0].innerText.trim();
+            } else if (input.placeholder) {
+              label = input.placeholder;
+            } else if (input.getAttribute("aria-label")) {
+              label = input.getAttribute("aria-label");
+            }
+
+            // Get options for select elements
+            let options = null;
+            if (input.tagName === "SELECT") {
+              options = Array.from(input.options).map((o) => ({
+                text: o.text,
+                value: o.value,
+              }));
+            }
+
+            return {
+              type: input.type || input.tagName.toLowerCase(),
+              selector: selector,
+              label: label || "Unlabeled field",
+              required:
+                input.required || input.getAttribute("required") !== null,
+              placeholder: input.placeholder || "",
+              name: input.name || "",
+              id: input.id || "",
+              options: options,
+            };
+          })
+          .filter(
+            (field) =>
+              // Filter out hidden fields
+              field.type !== "hidden" &&
+              // Keep submit buttons
+              (field.type !== "button" || field.selector.includes("submit"))
+          );
+      });
+
+      await browser.close();
+
+      console.log(`Found ${fields.length} fields`);
+
+      return res.json({
+        success: true,
+        url: url,
+        fields: fields,
+        totalFields: fields.length,
+      });
+    } catch (error) {
+      await browser.close();
+      throw error;
+    }
+  } catch (error) {
+    console.error("Scraping error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
