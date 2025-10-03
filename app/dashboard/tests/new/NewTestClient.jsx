@@ -431,7 +431,7 @@ Check the Results tab for more details including error screenshots.`,
   };
 
   return (
-    <div className="h-screen bg-stone-50 overflow-hidden flex flex-col">
+    <div className="h-screen w-screen bg-stone-50 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-stone-200 flex-shrink-0">
         <div className="px-6 py-4">
@@ -478,9 +478,9 @@ Check the Results tab for more details including error screenshots.`,
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 w-full">
         {/* Chat Window - Left Side */}
-        <div className="w-1/2 border-r border-stone-200 bg-white flex flex-col min-h-0">
+        <div className="w-1/2 border-r border-stone-200 bg-white flex flex-col min-h-0 overflow-hidden">
           <div className="p-4 border-b border-stone-200 flex-shrink-0">
             <h2 className="text-lg font-medium text-slate-800">Mad Hatter</h2>
             <p className="text-sm text-stone-600">
@@ -532,7 +532,7 @@ Check the Results tab for more details including error screenshots.`,
         </div>
 
         {/* Preview Window - Right Side */}
-        <div className="w-1/2 bg-stone-50 flex flex-col min-h-0">
+        <div className="w-1/2 bg-stone-50 flex flex-col min-h-0 overflow-hidden">
           <div className="p-4 bg-white border-b border-stone-200 flex-shrink-0">
             <h2 className="text-lg font-medium text-slate-800">Test Preview</h2>
             <p className="text-sm text-stone-600">
