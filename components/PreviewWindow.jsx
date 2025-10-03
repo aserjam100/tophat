@@ -65,7 +65,7 @@ export default function PreviewWindow({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Tab Navigation */}
       <div className="bg-white border-b border-stone-200">
         <div className="flex">
@@ -131,7 +131,7 @@ export default function PreviewWindow({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {activeTab === "details" && (
           <div className="p-4 space-y-6">
             {/* Status Display */}
@@ -224,7 +224,10 @@ export default function PreviewWindow({
               {testData.commands && testData.commands.length > 0 ? (
                 <div className="space-y-3">
                   {testData.commands.map((command, index) => (
-                    <div key={index} className="border border-stone-200 rounded-lg p-3">
+                    <div
+                      key={index}
+                      className="border border-stone-200 rounded-lg p-3"
+                    >
                       <div className="flex items-center gap-2 mb-2">
                         <span className="bg-slate-800 text-white text-xs px-2 py-1 rounded">
                           {index + 1}
@@ -233,15 +236,16 @@ export default function PreviewWindow({
                           {command.action}
                         </span>
                       </div>
-                      
+
                       <div className="text-sm text-stone-600 mb-2">
                         {command.description}
                       </div>
-                      
+
                       <div className="space-y-1 text-xs">
                         {command.url && (
                           <div>
-                            <span className="font-medium">URL:</span> {command.url}
+                            <span className="font-medium">URL:</span>{" "}
+                            {command.url}
                           </div>
                         )}
                         {command.selector && (
@@ -254,7 +258,8 @@ export default function PreviewWindow({
                         )}
                         {command.text && (
                           <div>
-                            <span className="font-medium">Text:</span> {command.text}
+                            <span className="font-medium">Text:</span>{" "}
+                            {command.text}
                           </div>
                         )}
                       </div>
@@ -286,7 +291,7 @@ export default function PreviewWindow({
                 <textarea
                   value={testData.script}
                   onChange={(e) => handleInputChange("script", e.target.value)}
-                  className="w-full h-96 px-3 py-2 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm resize-none"
+                  className="w-full h-96 px-3 py-2 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm resize-none overflow-x-auto"
                   placeholder="// Script preview will appear here..."
                 />
               ) : (
@@ -311,7 +316,7 @@ export default function PreviewWindow({
                 <label className="block text-sm font-medium text-slate-800 mb-2">
                   Test Execution Results
                 </label>
-                
+
                 {/* Show results if test has been executed */}
                 {testData.executionResults ? (
                   <div className="space-y-4">
@@ -326,60 +331,84 @@ export default function PreviewWindow({
                             }`}
                           />
                           <div>
-                            <h3 className={`font-semibold ${statusDisplay.color}`}>
-                              Test {testData.status?.charAt(0).toUpperCase() + testData.status?.slice(1)}
+                            <h3
+                              className={`font-semibold ${statusDisplay.color}`}
+                            >
+                              Test{" "}
+                              {testData.status?.charAt(0).toUpperCase() +
+                                testData.status?.slice(1)}
                             </h3>
                             {testData.executionResults.executionTime && (
                               <div className="flex items-center gap-1 text-sm text-stone-600">
                                 <Timer size={14} />
-                                Execution time: {formatExecutionTime(testData.executionResults.executionTime)}
+                                Execution time:{" "}
+                                {formatExecutionTime(
+                                  testData.executionResults.executionTime
+                                )}
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Error message if failed */}
-                      {testData.status === 'failed' && testData.executionResults.error && (
-                        <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded text-sm text-red-800">
-                          <strong>Error:</strong> {testData.executionResults.error}
-                        </div>
-                      )}
+                      {testData.status === "failed" &&
+                        testData.executionResults.error && (
+                          <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded text-sm text-red-800">
+                            <strong>Error:</strong>{" "}
+                            {testData.executionResults.error}
+                          </div>
+                        )}
                     </div>
 
                     {/* Screenshots Section - FIXED */}
-                    {testData.executionResults.screenshots && testData.executionResults.screenshots.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
-                          <Image size={18} />
-                          Screenshots ({testData.executionResults.screenshots.length})
-                        </h4>
-                        <div className="grid gap-4">
-                          {testData.executionResults.screenshots.map((screenshot, index) => {
-                            // Handle both string format (old) and object format (new)
-                            const screenshotData = typeof screenshot === 'string' 
-                              ? { filename: screenshot, data: `/screenshots/${screenshot}`, type: 'success' }
-                              : screenshot;
-                            
-                            return (
-                              <div key={index} className="border border-stone-200 rounded-lg overflow-hidden bg-white">
-                                <div className="p-2 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                                  <p className="text-sm font-medium text-stone-700">
-                                    {screenshotData.filename}
-                                  </p>
-                                  {screenshotData.type === 'failure' && (
-                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-                                      Failure
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="p-2">
-                                  <img 
-                                    src={screenshotData.data || screenshotData.url || `/screenshots/${screenshotData.filename}`}
-                                    alt={`Test screenshot ${index + 1}`}
-                                    className="w-full h-auto max-h-96 object-contain bg-gray-50 rounded"
-                                    onError={(e) => {
-                                      e.target.parentElement.innerHTML = `
+                    {testData.executionResults.screenshots &&
+                      testData.executionResults.screenshots.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
+                            <Image size={18} />
+                            Screenshots (
+                            {testData.executionResults.screenshots.length})
+                          </h4>
+                          <div className="grid gap-4">
+                            {testData.executionResults.screenshots.map(
+                              (screenshot, index) => {
+                                // Handle both string format (old) and object format (new)
+                                const screenshotData =
+                                  typeof screenshot === "string"
+                                    ? {
+                                        filename: screenshot,
+                                        data: `/screenshots/${screenshot}`,
+                                        type: "success",
+                                      }
+                                    : screenshot;
+
+                                return (
+                                  <div
+                                    key={index}
+                                    className="border border-stone-200 rounded-lg overflow-hidden bg-white"
+                                  >
+                                    <div className="p-2 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                                      <p className="text-sm font-medium text-stone-700">
+                                        {screenshotData.filename}
+                                      </p>
+                                      {screenshotData.type === "failure" && (
+                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                                          Failure
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="p-2">
+                                      <img
+                                        src={
+                                          screenshotData.data ||
+                                          screenshotData.url ||
+                                          `/screenshots/${screenshotData.filename}`
+                                        }
+                                        alt={`Test screenshot ${index + 1}`}
+                                        className="w-full h-auto max-h-96 object-contain bg-gray-50 rounded"
+                                        onError={(e) => {
+                                          e.target.parentElement.innerHTML = `
                                         <div class="flex items-center justify-center h-32 bg-stone-100 text-stone-500 rounded">
                                           <div class="text-center">
                                             <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,20 +418,24 @@ export default function PreviewWindow({
                                           </div>
                                         </div>
                                       `;
-                                    }}
-                                  />
-                                </div>
-                                {screenshotData.takenAt && (
-                                  <div className="px-2 pb-2 text-xs text-stone-500">
-                                    Captured at: {new Date(screenshotData.takenAt).toLocaleString()}
+                                        }}
+                                      />
+                                    </div>
+                                    {screenshotData.takenAt && (
+                                      <div className="px-2 pb-2 text-xs text-stone-500">
+                                        Captured at:{" "}
+                                        {new Date(
+                                          screenshotData.takenAt
+                                        ).toLocaleString()}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                );
+                              }
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Test Log (if available) */}
                     {testData.executionResults.logs && (
@@ -411,7 +444,9 @@ export default function PreviewWindow({
                           Execution Log
                         </h4>
                         <div className="bg-stone-900 text-stone-100 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
-                          <pre className="whitespace-pre-wrap">{testData.executionResults.logs}</pre>
+                          <pre className="whitespace-pre-wrap">
+                            {testData.executionResults.logs}
+                          </pre>
                         </div>
                       </div>
                     )}
@@ -420,18 +455,25 @@ export default function PreviewWindow({
                   /* No results yet */
                   <div className="h-64 border-2 border-dashed border-stone-300 rounded-md flex items-center justify-center">
                     <div className="text-center text-stone-500">
-                      <BarChart3 size={48} className="mx-auto mb-4 text-stone-400" />
+                      <BarChart3
+                        size={48}
+                        className="mx-auto mb-4 text-stone-400"
+                      />
                       <p className="text-lg mb-2">No results yet</p>
                       <p className="text-sm mb-4">
                         Run your test to see execution results and screenshots
                       </p>
-                      <Button 
+                      <Button
                         onClick={onRunTest}
-                        disabled={!testData.commands || testData.commands.length === 0 || testData.isRunning}
+                        disabled={
+                          !testData.commands ||
+                          testData.commands.length === 0 ||
+                          testData.isRunning
+                        }
                         size="sm"
                       >
                         <Play size={16} className="mr-2" />
-                        {testData.isRunning ? 'Running...' : 'Run Test'}
+                        {testData.isRunning ? "Running..." : "Run Test"}
                       </Button>
                     </div>
                   </div>
