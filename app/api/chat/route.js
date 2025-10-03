@@ -154,12 +154,13 @@ export async function POST(request) {
             ],
           });
 
-          // Return the text response after tool use
-          const textContent = followUpResponse.content.find(
-            (block) => block.type === "text"
-          );
+          // Return ALL text content blocks concatenated
+          const textBlocks = followUpResponse.content
+            .filter((block) => block.type === "text")
+            .map((block) => block.text);
+
           return NextResponse.json({
-            content: textContent?.text || "Form scraped successfully",
+            content: textBlocks.join("\n\n"),
             id: followUpResponse.id,
             toolUsed: true,
             scrapedData: scrapedData,
@@ -191,13 +192,12 @@ export async function POST(request) {
             ],
           });
 
-          const textContent = errorResponse.content.find(
-            (block) => block.type === "text"
-          );
+          const textBlocks = errorResponse.content
+            .filter((block) => block.type === "text")
+            .map((block) => block.text);
+
           return NextResponse.json({
-            content:
-              textContent?.text ||
-              "Scraping failed, please provide field details manually",
+            content: textBlocks.join("\n\n"),
             id: errorResponse.id,
             toolUsed: true,
             error: scrapingError.message,
@@ -207,8 +207,13 @@ export async function POST(request) {
     }
 
     // Regular text response (no tool use)
+    // Return ALL text blocks concatenated
+    const textBlocks = response.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text);
+
     return NextResponse.json({
-      content: response.content[0].text,
+      content: textBlocks.join("\n\n"),
       id: response.id,
       toolUsed: false,
     });
