@@ -18,6 +18,10 @@ export async function POST(request) {
     );
 
     const data = await response.json();
+
+    // Revalidate the dashboard to show the new test immediately
+    revalidatePath("/dashboard");
+
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error("Proxy Error:", error);
