@@ -263,11 +263,25 @@ async function executeCommand(page, command) {
       break;
 
     case "waitForNavigation":
-      console.log("Waiting for navigation...");
-      await page.waitForNavigation({
-        waitUntil: "networkidle2",
-        timeout: 30000,
-      });
+      console.log("Waiting for navigation or content load...");
+
+      // Try navigation first, but don't fail if it times out
+      const navigationPromise = page
+        .waitForNavigation({
+          waitUntil: "networkidle2",
+          timeout: 30000,
+        })
+        .catch(() => null);
+
+      // Also wait for the URL to change OR a reasonable time
+      const navigationResult = await Promise.race([
+        navigationPromise,
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+
+      if (!navigationResult) {
+        console.log("No traditional navigation detected (likely SPA)");
+      }
       break;
 
     case "screenshot":
