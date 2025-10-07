@@ -83,7 +83,7 @@ function generatePuppeteerScript(commands, testName, testDescription) {
   script += `    \n`;
   script += `  } catch (error) {\n`;
   script += `    console.error('Test failed:', error.message);\n`;
-  script += `    await page.screenshot({ path: 'test-failure.png', fullPage: true });\n`;
+  script += `    await page.screenshot({ path: 'test-failure.png', fullPage: false });\n`;
   script += `    return { success: false, error: error.message };\n`;
   script += `    \n`;
   script += `  } finally {\n`;
@@ -114,7 +114,7 @@ function generateCommandCode(command) {
 
     case "screenshot":
       const filename = command.filename || `screenshot-${Date.now()}.png`;
-      return `    await page.screenshot({ path: '${filename}', fullPage: true });\n`;
+      return `    await page.screenshot({ path: '${filename}', fullPage: false });\n`;
 
     case "waitForText":
       return `    await page.waitForFunction(\n      (text) => document.body.innerText.includes(text),\n      {},\n      '${command.text}'\n    );\n`;
@@ -194,7 +194,7 @@ async function executePuppeteerTest(commands) {
       // Take screenshot on failure and convert to base64
       try {
         const failureScreenshot = await page.screenshot({
-          fullPage: true,
+          fullPage: false,
           type: "png",
         });
 
@@ -289,7 +289,7 @@ async function executeCommand(page, command) {
       console.log(`Taking screenshot: ${filename}`);
 
       const screenshotBuffer = await page.screenshot({
-        fullPage: true,
+        fullPage: false,
         type: "png",
       });
 
