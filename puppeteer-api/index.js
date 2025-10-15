@@ -3,12 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
-// Replace the regular puppeteer import with puppeteer-extra
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-
-// Use stealth plugin
-puppeteer.use(StealthPlugin());
+const puppeteer = require("puppeteer");
 
 const app = express();
 
@@ -67,30 +62,20 @@ function generatePuppeteerScript(commands, testName, testDescription) {
   script += `// ${testDescription}\n`;
   script += `// Generated on: ${new Date().toISOString()}\n\n`;
 
-  script += `const puppeteer = require('puppeteer-extra');\n`;
-  script += `const StealthPlugin = require('puppeteer-extra-plugin-stealth');\n`;
-  script += `puppeteer.use(StealthPlugin());\n\n`;
+  script += `const puppeteer = require('puppeteer');\n\n`;
 
   script += `async function runTest() {\n`;
   script += `  const browser = await puppeteer.launch({ \n`;
-  script += `    headless: 'new',\n`;
+  script += `    headless: true,\n`;
   script += `    args: [\n`;
   script += `      '--no-sandbox',\n`;
   script += `      '--disable-setuid-sandbox',\n`;
-  script += `      '--disable-blink-features=AutomationControlled',\n`;
   script += `      '--disable-dev-shm-usage',\n`;
   script += `      '--disable-gpu'\n`;
   script += `    ]\n`;
   script += `  });\n`;
   script += `  const page = await browser.newPage();\n`;
   script += `  \n`;
-  script += `  // Anti-detection measures\n`;
-  script += `  await page.evaluateOnNewDocument(() => {\n`;
-  script += `    Object.defineProperty(navigator, 'webdriver', { get: () => false });\n`;
-  script += `    window.chrome = { runtime: {} };\n`;
-  script += `  });\n`;
-  script += `  \n`;
-  script += `  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');\n`;
   script += `  await page.setViewport({ width: 1920, height: 1080 });\n`;
   script += `  \n`;
   script += `  try {\n`;
@@ -168,52 +153,19 @@ async function executePuppeteerTest(commands) {
 
   try {
     const browser = await puppeteer.launch({
-      headless: "new", // Use new headless mode which is harder to detect
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=IsolateOrigins,site-per-process",
-        "--disable-web-security",
-        "--disable-dev-shm-usage", // Overcome limited resource problems on some servers
-        "--disable-accelerated-2d-canvas",
-        "--no-first-run",
-        "--no-zygote",
+        "--disable-dev-shm-usage",
         "--disable-gpu",
       ],
     });
     const page = await browser.newPage();
 
-    // Set a realistic user agent
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
-
-    // Set viewport
     await page.setViewport({
       width: 1920,
       height: 1080,
-    });
-
-    // Additional anti-detection measures
-    await page.evaluateOnNewDocument(() => {
-      // Overwrite the `plugins` property to use a custom getter
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-      });
-
-      // Pass the Chrome Test
-      window.chrome = {
-        runtime: {},
-      };
-
-      // Pass the Permissions Test
-      const originalQuery = window.navigator.permissions.query;
-      window.navigator.permissions.query = (parameters) => (
-        parameters.name === 'notifications' ?
-          Promise.resolve({ state: Notification.permission }) :
-          originalQuery(parameters)
-      );
     });
 
     let testResult = { success: false, error: "Unknown error" };
@@ -285,89 +237,10 @@ async function executeCommand(page, command) {
   switch (command.action) {
     case "navigate":
       console.log(`Navigating to: ${command.url}`);
-
-      // Set user agent before navigation
-      await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      );
-
-      await page.setViewport({
-        width: 1920,
-        height: 1080,
+      await page.goto(command.url, {
+        waitUntil: "networkidle2",
+        timeout: 30000,
       });
-
-      // Try to navigate with a more lenient wait strategy for Cloudflare
-      try {
-        await page.goto(command.url, {
-          waitUntil: "domcontentloaded",
-          timeout: 60000,
-        });
-      } catch (gotoError) {
-        // If goto times out, it might still be loading Cloudflare challenge
-        console.log('Initial navigation timeout, page might still be loading...');
-      }
-
-      // Wait a bit for Cloudflare to potentially start loading
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      console.log('Page loaded, checking for Cloudflare...');
-
-      // Check for Cloudflare challenge and wait for it to complete
-      const maxWaitTime = 60000; // Maximum 60 seconds to wait for Cloudflare
-      const startWait = Date.now();
-      let challengeDetected = false;
-
-      while (Date.now() - startWait < maxWaitTime) {
-        const isCloudflare = await page.evaluate(() => {
-          // Check for common Cloudflare indicators
-          const bodyText = document.body.innerText || '';
-          const title = document.title || '';
-          const html = document.documentElement.outerHTML || '';
-
-          return bodyText.includes('Verifying you are human') ||
-                 bodyText.includes('Checking your browser') ||
-                 bodyText.includes('Please wait') ||
-                 title.includes('Just a moment') ||
-                 title.includes('Attention Required') ||
-                 html.includes('cf-browser-verification') ||
-                 html.includes('cf-challenge-running') ||
-                 html.includes('challenge-platform');
-        });
-
-        if (isCloudflare) {
-          if (!challengeDetected) {
-            console.log('Cloudflare challenge detected, waiting for completion...');
-            challengeDetected = true;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        } else {
-          if (challengeDetected) {
-            console.log('Cloudflare challenge completed successfully!');
-          }
-          break;
-        }
-      }
-
-      // If we hit the timeout and Cloudflare is still there, throw an error
-      if (challengeDetected) {
-        const stillBlocked = await page.evaluate(() => {
-          const bodyText = document.body.innerText || '';
-          const title = document.title || '';
-          return bodyText.includes('Verifying you are human') ||
-                 bodyText.includes('Checking your browser') ||
-                 title.includes('Just a moment');
-        });
-
-        if (stillBlocked) {
-          console.error('Cloudflare challenge timeout - page may still be loading or blocked');
-          throw new Error('Cloudflare challenge did not complete within timeout. The site may have stricter bot protection.');
-        } else {
-          console.log('Cloudflare challenge appears to have completed after timeout check');
-        }
-      }
-
-      // Add a small delay after navigation for page to fully load
-      await new Promise((resolve) => setTimeout(resolve, 2000));
       break;
 
     case "waitForSelector":
@@ -541,110 +414,26 @@ app.post("/api/scrape-form", async (req, res) => {
     console.log("Scraping form:", url);
 
     const browser = await puppeteer.launch({
-      headless: "new", // Use new headless mode which is harder to detect
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=IsolateOrigins,site-per-process",
         "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--no-first-run",
-        "--no-zygote",
         "--disable-gpu",
       ],
     });
     const page = await browser.newPage();
-
-    // Set realistic user agent and viewport
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
 
     await page.setViewport({
       width: 1920,
       height: 1080,
     });
 
-    // Additional anti-detection measures
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-      });
-
-      window.chrome = {
-        runtime: {},
-      };
-
-      const originalQuery = window.navigator.permissions.query;
-      window.navigator.permissions.query = (parameters) => (
-        parameters.name === 'notifications' ?
-          Promise.resolve({ state: Notification.permission }) :
-          originalQuery(parameters)
-      );
-    });
-
     try {
       await page.goto(url, {
-        waitUntil: "networkidle0",
+        waitUntil: "networkidle2",
         timeout: 30000,
       });
-
-      // Check for Cloudflare challenge and wait for it to complete
-      const maxWaitTime = 60000; // Maximum 60 seconds to wait for Cloudflare
-      const startWait = Date.now();
-      let challengeDetected = false;
-
-      while (Date.now() - startWait < maxWaitTime) {
-        const isCloudflare = await page.evaluate(() => {
-          const bodyText = document.body.innerText || '';
-          const title = document.title || '';
-          const html = document.documentElement.outerHTML || '';
-
-          return bodyText.includes('Verifying you are human') ||
-                 bodyText.includes('Checking your browser') ||
-                 bodyText.includes('Please wait') ||
-                 title.includes('Just a moment') ||
-                 title.includes('Attention Required') ||
-                 html.includes('cf-browser-verification') ||
-                 html.includes('cf-challenge-running') ||
-                 html.includes('challenge-platform');
-        });
-
-        if (isCloudflare) {
-          if (!challengeDetected) {
-            console.log('Cloudflare challenge detected, waiting for completion...');
-            challengeDetected = true;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        } else {
-          if (challengeDetected) {
-            console.log('Cloudflare challenge completed successfully!');
-          }
-          break;
-        }
-      }
-
-      // If we hit the timeout and Cloudflare is still there, throw an error
-      if (challengeDetected) {
-        const stillBlocked = await page.evaluate(() => {
-          const bodyText = document.body.innerText || '';
-          const title = document.title || '';
-          return bodyText.includes('Verifying you are human') ||
-                 bodyText.includes('Checking your browser') ||
-                 title.includes('Just a moment');
-        });
-
-        if (stillBlocked) {
-          console.error('Cloudflare challenge timeout - page may still be loading or blocked');
-          throw new Error('Cloudflare challenge did not complete within timeout. The site may have stricter bot protection.');
-        } else {
-          console.log('Cloudflare challenge appears to have completed after timeout check');
-        }
-      }
-
-      // Wait longer for dynamic content
-      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const fields = await page.evaluate(() => {
         const formFields = [];
