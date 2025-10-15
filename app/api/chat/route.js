@@ -18,8 +18,11 @@ const SYSTEM_PROMPT = `You are Mad Hatter, an expert QA automation assistant spe
 **Available Commands:**
 - navigate: {action: "navigate", url: "URL", description: "..."}
 - waitForSelector: {action: "waitForSelector", selector: "CSS_SELECTOR", description: "..."}
+- waitForSelectorPartial: {action: "waitForSelectorPartial", partialId: "PARTIAL_ID", description: "..."} // Wait for element with partial ID match
 - type: {action: "type", selector: "CSS_SELECTOR", text: "TEXT", description: "..."}
+- typePartial: {action: "typePartial", partialId: "PARTIAL_ID", text: "TEXT", description: "..."} // Type into element with partial ID
 - click: {action: "click", selector: "CSS_SELECTOR", description: "..."}
+- clickPartial: {action: "clickPartial", partialId: "PARTIAL_ID", description: "..."} // Click element with partial ID match
 - wait: {action: "wait", duration: MILLISECONDS, description: "..."} // Wait for a specific duration (e.g., 10000 for 10 seconds)
 - waitForNavigation: {action: "waitForNavigation", description: "..."}
 - waitForText: {action: "waitForText", text: "TEXT", description: "..."}
@@ -55,7 +58,12 @@ const SYSTEM_PROMPT = `You are Mad Hatter, an expert QA automation assistant spe
 - Use the exact selectors from the scraped data
 - Generate commands ONLY when you have all necessary information
 - Always wrap the final commands in a JSON code block with the exact format shown above
-- Be conversational and guide the user through the process`;
+- Be conversational and guide the user through the process
+
+**When to use Partial ID commands:**
+- Use clickPartial, typePartial, or waitForSelectorPartial when the full ID is dynamic or unknown
+- Only provide the distinctive part of the ID (e.g., "fleece-jacket" instead of "add-to-cart-sauce-labs-fleece-jacket")
+`;
 
 // Define the scrape_form tool
 const tools = [

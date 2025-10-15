@@ -98,6 +98,15 @@ function generateCommandCode(command) {
     case "click":
       return `    await page.click('${command.selector}');\n`;
 
+    case "clickPartial":
+      return `    await page.click('[id*="${command.partialId}"]');\n`;
+
+    case "typePartial":
+      return `    await page.type('[id*="${command.partialId}"]', '${command.text}');\n`;
+
+    case "waitForSelectorPartial":
+      return `    await page.waitForSelector('[id*="${command.partialId}"]', { timeout: 10000 });\n`;
+
     case "waitForNavigation":
       return `    await page.waitForNavigation({ waitUntil: 'networkidle2' });\n`;
 
@@ -259,6 +268,28 @@ async function executeCommand(page, command) {
       console.log(`Clicking: ${command.selector}`);
       await page.waitForSelector(command.selector);
       await page.click(command.selector);
+      break;
+
+    case "clickPartial":
+      console.log(`Clicking element with partial ID: ${command.partialId}`);
+      const partialSelector = `[id*="${command.partialId}"]`;
+      await page.waitForSelector(partialSelector);
+      await page.click(partialSelector);
+      break;
+
+    case "typePartial":
+      console.log(`Typing into element with partial ID: ${command.partialId}`);
+      const partialTypeSelector = `[id*="${command.partialId}"]`;
+      await page.waitForSelector(partialTypeSelector);
+      await page.click(partialTypeSelector);
+      await page.type(partialTypeSelector, command.text, { delay: 50 });
+      break;
+
+    case "waitForSelectorPartial":
+      console.log(`Waiting for element with partial ID: ${command.partialId}`);
+      await page.waitForSelector(`[id*="${command.partialId}"]`, {
+        timeout: 10000,
+      });
       break;
 
     case "waitForNavigation":
@@ -439,23 +470,27 @@ app.post("/api/scrape-form", async (req, res) => {
         const formFields = [];
 
         // Find all input, textarea, and select elements
-        const inputs = document.querySelectorAll('input, textarea, select, button[type="submit"]');
+        const inputs = document.querySelectorAll(
+          'input, textarea, select, button[type="submit"]'
+        );
 
         inputs.forEach((element, index) => {
           const tagName = element.tagName.toLowerCase();
-          const type = element.getAttribute('type') || (tagName === 'select' ? 'select' : 'text');
+          const type =
+            element.getAttribute("type") ||
+            (tagName === "select" ? "select" : "text");
 
           // Skip hidden inputs and submit buttons we don't need
-          if (type === 'hidden') return;
+          if (type === "hidden") return;
 
           const field = {
             tagName: tagName,
             type: type,
             id: element.id || null,
-            name: element.getAttribute('name') || null,
-            placeholder: element.getAttribute('placeholder') || null,
+            name: element.getAttribute("name") || null,
+            placeholder: element.getAttribute("placeholder") || null,
             value: element.value || null,
-            required: element.hasAttribute('required'),
+            required: element.hasAttribute("required"),
             // Generate a CSS selector for this element
             selector: null,
           };
@@ -469,12 +504,14 @@ app.post("/api/scrape-form", async (req, res) => {
             field.selector = `[placeholder="${element.placeholder}"]`;
           } else {
             // Fallback to a more specific selector
-            field.selector = `${tagName}[type="${type}"]:nth-of-type(${index + 1})`;
+            field.selector = `${tagName}[type="${type}"]:nth-of-type(${
+              index + 1
+            })`;
           }
 
           // For select elements, get options
-          if (tagName === 'select') {
-            field.options = Array.from(element.options).map(opt => ({
+          if (tagName === "select") {
+            field.options = Array.from(element.options).map((opt) => ({
               value: opt.value,
               text: opt.text,
             }));
@@ -483,11 +520,13 @@ app.post("/api/scrape-form", async (req, res) => {
           // Try to find associated label
           let label = null;
           if (element.id) {
-            const labelEl = document.querySelector(`label[for="${element.id}"]`);
+            const labelEl = document.querySelector(
+              `label[for="${element.id}"]`
+            );
             if (labelEl) label = labelEl.textContent.trim();
           }
           if (!label) {
-            const parentLabel = element.closest('label');
+            const parentLabel = element.closest("label");
             if (parentLabel) label = parentLabel.textContent.trim();
           }
           field.label = label;
