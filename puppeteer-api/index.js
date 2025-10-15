@@ -182,6 +182,27 @@ async function executePuppeteerTest(commands) {
       height: 1080,
     });
 
+    // Additional anti-detection measures
+    await page.evaluateOnNewDocument(() => {
+      // Overwrite the `plugins` property to use a custom getter
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => false,
+      });
+
+      // Pass the Chrome Test
+      window.chrome = {
+        runtime: {},
+      };
+
+      // Pass the Permissions Test
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Notification.permission }) :
+          originalQuery(parameters)
+      );
+    });
+
     let testResult = { success: false, error: "Unknown error" };
     let screenshots = [];
 
@@ -266,6 +287,32 @@ async function executeCommand(page, command) {
         waitUntil: "networkidle2",
         timeout: 30000,
       });
+
+      // Check for Cloudflare challenge and wait for it to complete
+      const maxWaitTime = 15000; // Maximum 15 seconds to wait for Cloudflare
+      const startWait = Date.now();
+
+      while (Date.now() - startWait < maxWaitTime) {
+        const cloudflareDetected = await page.evaluate(() => {
+          // Check for common Cloudflare indicators
+          const bodyText = document.body.innerText || '';
+          const title = document.title || '';
+
+          return bodyText.includes('Verifying you are human') ||
+                 bodyText.includes('Checking your browser') ||
+                 title.includes('Just a moment') ||
+                 document.querySelector('.cf-browser-verification') !== null ||
+                 document.querySelector('#cf-challenge-running') !== null;
+        });
+
+        if (!cloudflareDetected) {
+          console.log('Cloudflare challenge completed or not detected');
+          break;
+        }
+
+        console.log('Cloudflare challenge detected, waiting...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       // Add a small delay after navigation
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -462,13 +509,56 @@ app.post("/api/scrape-form", async (req, res) => {
       height: 1080,
     });
 
+    // Additional anti-detection measures
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => false,
+      });
+
+      window.chrome = {
+        runtime: {},
+      };
+
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Notification.permission }) :
+          originalQuery(parameters)
+      );
+    });
+
     try {
       await page.goto(url, {
         waitUntil: "networkidle0",
         timeout: 30000,
       });
 
-      // Wait longer for dynamic content and bot detection
+      // Check for Cloudflare challenge and wait for it to complete
+      const maxWaitTime = 15000;
+      const startWait = Date.now();
+
+      while (Date.now() - startWait < maxWaitTime) {
+        const cloudflareDetected = await page.evaluate(() => {
+          const bodyText = document.body.innerText || '';
+          const title = document.title || '';
+
+          return bodyText.includes('Verifying you are human') ||
+                 bodyText.includes('Checking your browser') ||
+                 title.includes('Just a moment') ||
+                 document.querySelector('.cf-browser-verification') !== null ||
+                 document.querySelector('#cf-challenge-running') !== null;
+        });
+
+        if (!cloudflareDetected) {
+          console.log('Cloudflare challenge completed or not detected');
+          break;
+        }
+
+        console.log('Cloudflare challenge detected, waiting...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // Wait longer for dynamic content
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const fields = await page.evaluate(() => {
