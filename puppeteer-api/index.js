@@ -296,15 +296,24 @@ async function executeCommand(page, command) {
         height: 1080,
       });
 
-      await page.goto(command.url, {
-        waitUntil: "networkidle2",
-        timeout: 30000,
-      });
+      // Try to navigate with a more lenient wait strategy for Cloudflare
+      try {
+        await page.goto(command.url, {
+          waitUntil: "domcontentloaded",
+          timeout: 60000,
+        });
+      } catch (gotoError) {
+        // If goto times out, it might still be loading Cloudflare challenge
+        console.log('Initial navigation timeout, page might still be loading...');
+      }
+
+      // Wait a bit for Cloudflare to potentially start loading
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       console.log('Page loaded, checking for Cloudflare...');
 
       // Check for Cloudflare challenge and wait for it to complete
-      const maxWaitTime = 30000; // Maximum 30 seconds to wait for Cloudflare
+      const maxWaitTime = 60000; // Maximum 60 seconds to wait for Cloudflare
       const startWait = Date.now();
       let challengeDetected = false;
 
@@ -330,7 +339,7 @@ async function executeCommand(page, command) {
             console.log('Cloudflare challenge detected, waiting for completion...');
             challengeDetected = true;
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         } else {
           if (challengeDetected) {
             console.log('Cloudflare challenge completed successfully!');
@@ -350,7 +359,10 @@ async function executeCommand(page, command) {
         });
 
         if (stillBlocked) {
+          console.error('Cloudflare challenge timeout - page may still be loading or blocked');
           throw new Error('Cloudflare challenge did not complete within timeout. The site may have stricter bot protection.');
+        } else {
+          console.log('Cloudflare challenge appears to have completed after timeout check');
         }
       }
 
@@ -579,7 +591,7 @@ app.post("/api/scrape-form", async (req, res) => {
       });
 
       // Check for Cloudflare challenge and wait for it to complete
-      const maxWaitTime = 30000;
+      const maxWaitTime = 60000; // Maximum 60 seconds to wait for Cloudflare
       const startWait = Date.now();
       let challengeDetected = false;
 
@@ -604,7 +616,7 @@ app.post("/api/scrape-form", async (req, res) => {
             console.log('Cloudflare challenge detected, waiting for completion...');
             challengeDetected = true;
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         } else {
           if (challengeDetected) {
             console.log('Cloudflare challenge completed successfully!');
@@ -624,7 +636,10 @@ app.post("/api/scrape-form", async (req, res) => {
         });
 
         if (stillBlocked) {
+          console.error('Cloudflare challenge timeout - page may still be loading or blocked');
           throw new Error('Cloudflare challenge did not complete within timeout. The site may have stricter bot protection.');
+        } else {
+          console.log('Cloudflare challenge appears to have completed after timeout check');
         }
       }
 
