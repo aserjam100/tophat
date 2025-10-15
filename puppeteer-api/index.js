@@ -632,7 +632,66 @@ app.post("/api/scrape-form", async (req, res) => {
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const fields = await page.evaluate(() => {
-        // ... your existing evaluation code
+        const formFields = [];
+
+        // Find all input, textarea, and select elements
+        const inputs = document.querySelectorAll('input, textarea, select, button[type="submit"]');
+
+        inputs.forEach((element, index) => {
+          const tagName = element.tagName.toLowerCase();
+          const type = element.getAttribute('type') || (tagName === 'select' ? 'select' : 'text');
+
+          // Skip hidden inputs and submit buttons we don't need
+          if (type === 'hidden') return;
+
+          const field = {
+            tagName: tagName,
+            type: type,
+            id: element.id || null,
+            name: element.getAttribute('name') || null,
+            placeholder: element.getAttribute('placeholder') || null,
+            value: element.value || null,
+            required: element.hasAttribute('required'),
+            // Generate a CSS selector for this element
+            selector: null,
+          };
+
+          // Determine the best selector to use
+          if (element.id) {
+            field.selector = `#${element.id}`;
+          } else if (element.name) {
+            field.selector = `[name="${element.name}"]`;
+          } else if (element.placeholder) {
+            field.selector = `[placeholder="${element.placeholder}"]`;
+          } else {
+            // Fallback to a more specific selector
+            field.selector = `${tagName}[type="${type}"]:nth-of-type(${index + 1})`;
+          }
+
+          // For select elements, get options
+          if (tagName === 'select') {
+            field.options = Array.from(element.options).map(opt => ({
+              value: opt.value,
+              text: opt.text,
+            }));
+          }
+
+          // Try to find associated label
+          let label = null;
+          if (element.id) {
+            const labelEl = document.querySelector(`label[for="${element.id}"]`);
+            if (labelEl) label = labelEl.textContent.trim();
+          }
+          if (!label) {
+            const parentLabel = element.closest('label');
+            if (parentLabel) label = parentLabel.textContent.trim();
+          }
+          field.label = label;
+
+          formFields.push(field);
+        });
+
+        return formFields;
       });
 
       await browser.close();
