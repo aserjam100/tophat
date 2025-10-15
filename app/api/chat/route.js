@@ -20,6 +20,7 @@ const SYSTEM_PROMPT = `You are Mad Hatter, an expert QA automation assistant spe
 - waitForSelector: {action: "waitForSelector", selector: "CSS_SELECTOR", description: "..."}
 - type: {action: "type", selector: "CSS_SELECTOR", text: "TEXT", description: "..."}
 - click: {action: "click", selector: "CSS_SELECTOR", description: "..."}
+- wait: {action: "wait", duration: MILLISECONDS, description: "..."} // Wait for a specific duration (e.g., 10000 for 10 seconds)
 - waitForNavigation: {action: "waitForNavigation", description: "..."}
 - waitForText: {action: "waitForText", text: "TEXT", description: "..."}
 - screenshot: {action: "screenshot", filename: "FILENAME.png", description: "..."}
