@@ -133,10 +133,10 @@ function generateCommandCode(command) {
       return `    await page.type('${command.selector}', '${command.text}');\n`;
 
     case "click":
-      return `    await page.click('${command.selector}');\n`;
+      return `    await page.waitForSelector('${command.selector}', { visible: true });\n    await page.evaluate((selector) => {\n      const element = document.querySelector(selector);\n      if (element) {\n        element.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        element.click();\n      }\n    }, '${command.selector}');\n    await page.waitForTimeout(500);\n`;
 
     case "clickPartial":
-      return `    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n`;
+      return `    await page.waitForSelector('[id*="${command.partialId}"]', { visible: true });\n    await page.evaluate((selector) => {\n      const element = document.querySelector(selector);\n      if (element) {\n        element.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        element.click();\n      }\n    }, '[id*="${command.partialId}"]');\n    await page.waitForTimeout(500);\n`;
 
     case "typePartial":
       return `    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n    await page.type('[id*="${command.partialId}"]', '${command.text}', { delay: 50 });\n`;
@@ -303,15 +303,31 @@ async function executeCommand(page, command) {
 
     case "click":
       console.log(`Clicking: ${command.selector}`);
-      await page.waitForSelector(command.selector);
-      await page.click(command.selector);
+      await page.waitForSelector(command.selector, { visible: true });
+      // Use JavaScript click for more reliability
+      await page.evaluate((selector) => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.click();
+        }
+      }, command.selector);
+      await new Promise((resolve) => setTimeout(resolve, 500));
       break;
 
     case "clickPartial":
       console.log(`Clicking element with partial ID: ${command.partialId}`);
       const partialSelector = `[id*="${command.partialId}"]`;
-      await page.waitForSelector(partialSelector);
-      await page.click(partialSelector);
+      await page.waitForSelector(partialSelector, { visible: true });
+      // Use JavaScript click for more reliability
+      await page.evaluate((selector) => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.click();
+        }
+      }, partialSelector);
+      await new Promise((resolve) => setTimeout(resolve, 500));
       break;
 
     case "typePartial":

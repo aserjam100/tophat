@@ -93,10 +93,10 @@ function generateCommandCode(command) {
       return `    console.log('Typing into: ${command.selector}');\n    await page.waitForSelector('${command.selector}');\n    await page.click('${command.selector}');\n    await page.type('${command.selector}', '${command.text}', { delay: 50 });\n`;
       
     case 'click':
-      return `    console.log('Clicking: ${command.selector}');\n    await page.waitForSelector('${command.selector}');\n    await page.click('${command.selector}');\n`;
+      return `    console.log('Clicking: ${command.selector}');\n    await page.waitForSelector('${command.selector}', { visible: true });\n    await page.evaluate((selector) => {\n      const element = document.querySelector(selector);\n      if (element) {\n        element.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        element.click();\n      }\n    }, '${command.selector}');\n    await page.waitForTimeout(500);\n`;
 
     case 'clickPartial':
-      return `    console.log('Clicking element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n`;
+      return `    console.log('Clicking element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]', { visible: true });\n    await page.evaluate((selector) => {\n      const element = document.querySelector(selector);\n      if (element) {\n        element.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        element.click();\n      }\n    }, '[id*="${command.partialId}"]');\n    await page.waitForTimeout(500);\n`;
 
     case 'typePartial':
       return `    console.log('Typing into element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n    await page.type('[id*="${command.partialId}"]', '${command.text}', { delay: 50 });\n`;
