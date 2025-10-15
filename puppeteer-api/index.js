@@ -81,7 +81,44 @@ function generatePuppeteerScript(commands, testName, testDescription) {
   script += `  try {\n`;
   script += `    console.log('Starting test: ${testName}');\n\n`;
 
-  // ... rest of your code
+  // Add each command
+  commands.forEach((command, index) => {
+    script += `    // Step ${index + 1}: ${command.description}\n`;
+    const commandCode = generateCommandCode(command);
+    script += `    console.log('${command.description}');\n`;
+    script += commandCode;
+    script += `\n`;
+  });
+
+  script += `    console.log('✅ Test completed successfully!');\n`;
+  script += `    return { success: true };\n`;
+  script += `    \n`;
+  script += `  } catch (error) {\n`;
+  script += `    console.error('❌ Test failed:', error.message);\n`;
+  script += `    // Take screenshot on failure\n`;
+  script += `    await page.screenshot({ \n`;
+  script += `      path: \`test-failure-\${Date.now()}.png\`, \n`;
+  script += `      fullPage: true \n`;
+  script += `    });\n`;
+  script += `    return { success: false, error: error.message };\n`;
+  script += `    \n`;
+  script += `  } finally {\n`;
+  script += `    await browser.close();\n`;
+  script += `  }\n`;
+  script += `}\n\n`;
+  script += `// Run the test\n`;
+  script += `if (require.main === module) {\n`;
+  script += `  runTest().then(result => {\n`;
+  script += `    console.log('Test result:', result);\n`;
+  script += `    process.exit(result.success ? 0 : 1);\n`;
+  script += `  }).catch(error => {\n`;
+  script += `    console.error('Unexpected error:', error);\n`;
+  script += `    process.exit(1);\n`;
+  script += `  });\n`;
+  script += `}\n\n`;
+  script += `module.exports = { runTest };`;
+
+  return script;
 }
 
 function generateCommandCode(command) {
@@ -99,10 +136,10 @@ function generateCommandCode(command) {
       return `    await page.click('${command.selector}');\n`;
 
     case "clickPartial":
-      return `    await page.click('[id*="${command.partialId}"]');\n`;
+      return `    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n`;
 
     case "typePartial":
-      return `    await page.type('[id*="${command.partialId}"]', '${command.text}');\n`;
+      return `    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n    await page.type('[id*="${command.partialId}"]', '${command.text}', { delay: 50 });\n`;
 
     case "waitForSelectorPartial":
       return `    await page.waitForSelector('[id*="${command.partialId}"]', { timeout: 10000 });\n`;

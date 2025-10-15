@@ -94,7 +94,16 @@ function generateCommandCode(command) {
       
     case 'click':
       return `    console.log('Clicking: ${command.selector}');\n    await page.waitForSelector('${command.selector}');\n    await page.click('${command.selector}');\n`;
-      
+
+    case 'clickPartial':
+      return `    console.log('Clicking element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n`;
+
+    case 'typePartial':
+      return `    console.log('Typing into element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]');\n    await page.click('[id*="${command.partialId}"]');\n    await page.type('[id*="${command.partialId}"]', '${command.text}', { delay: 50 });\n`;
+
+    case 'waitForSelectorPartial':
+      return `    console.log('Waiting for element with partial ID: ${command.partialId}');\n    await page.waitForSelector('[id*="${command.partialId}"]', { timeout: 10000 });\n`;
+
     case 'waitForNavigation':
       return `    console.log('Waiting for navigation...');\n    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });\n`;
       
